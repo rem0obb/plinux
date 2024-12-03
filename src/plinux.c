@@ -39,9 +39,9 @@ intptr_t
 pt_resolve(pid_t pid, const char* nid) {
   intptr_t addr;
 
-  if((addr=kernel_dynlib_resolve(pid, 0x1, nid))) {
-    return addr;
-  }
+  //if((addr=kernel_dynlib_resolve(pid, 0x1, nid))) {
+  //  return addr;
+  //}
 
-  return kernel_dynlib_resolve(pid, 0x2001, nid);
+  return 0;//kernel_dynlib_resolve(pid, 0x2001, nid);
 }
