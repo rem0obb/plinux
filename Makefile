@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -Iinclude -Ilibraries/plthook/include
+CFLAGS = -Wall -Wextra -O2 -Iinclude -Ilibraries/plthook
 AR = ar
 ARFLAGS = rcs
 
@@ -7,7 +7,7 @@ SRC_DIR = src
 EXAMPLE_DIR = example
 BUILD_DIR = build
 PLTHOOK_DIR = libraries/plthook
-PLTHOOK_SRC_DIR = $(PLTHOOK_DIR)/src
+PLTHOOK_SRC_DIR = $(PLTHOOK_DIR)
 PLTHOOK_BUILD_DIR = $(BUILD_DIR)/plthook
 LIB_NAME = libplinux.a
 PLTHOOK_LIB = libplthook.a
@@ -15,7 +15,7 @@ PLTHOOK_LIB = libplthook.a
 SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
 OBJ_FILES = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(SRC_FILES))
 
-PLTHOOK_SRC_FILES = $(wildcard $(PLTHOOK_SRC_DIR)/*.c)
+PLTHOOK_SRC_FILES = $(wildcard $(PLTHOOK_SRC_DIR)/*elf.c)
 PLTHOOK_OBJ_FILES = $(patsubst $(PLTHOOK_SRC_DIR)/%.c,$(PLTHOOK_BUILD_DIR)/%.o,$(PLTHOOK_SRC_FILES))
 
 EXAMPLE_SRC = $(EXAMPLE_DIR)/main.c

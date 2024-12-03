@@ -4,15 +4,18 @@
 
 int main(int argc, char *argv[])
 {
-    if (pt_attach(atoi(argv[1])) != -1)
+    if (argc >= 2)
     {
-        puts("[+] pt_attach pid succesful");
-    }
+        if (pt_attach(atoi(argv[1])) != -1)
+        {
+            puts("[+] pt_attach pid succesful");
+        }
 
-    if (pt_detach(atoi(argv[1])) != -1)
-    {
-        puts("[+] pt_detach pid succesful");
+        if (pt_detach(atoi(argv[1])) != -1)
+        {
+            puts("[+] pt_detach pid succesful");
+        }
     }
-
+    
     return 0;
 }

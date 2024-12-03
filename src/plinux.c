@@ -17,6 +17,7 @@ along with this program; see the file COPYING. If not, see
 
 #include <plinux.h>
 #include <sys/ptrace.h>
+#include <plthook.h>
 
 long int pt_attach(pid_t pid)
 {
