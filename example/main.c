@@ -13,19 +13,12 @@ int main(int argc, char *argv[])
     if (plinux_attach(atoi(argv[1])) != -1)
     {
         const char *nid = argv[2];
-        plthook_t *plthook = plinux_dlopen_self();
-        if (!plthook)
-        {
-            return EXIT_FAILURE;
-        }
-
-        void *addr = plinux_resolve(plthook, nid);
+        void *addr = plinux_resolve(atoi(argv[1]), nid);
         if (addr)
         {
             printf("Resolved address: %p\n", addr);
         }
 
-        plthook_close(plthook);
         return addr ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 

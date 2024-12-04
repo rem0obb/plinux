@@ -29,5 +29,5 @@ long int
 plinux_continue(pid_t pid, int sig);
 
 plthook_t *plinux_dlopen_self();
-void *plinux_resolve(plthook_t *plthook, const char *nid);
+void *plinux_resolve(pid_t pid, const char *symbol_name);
 plthook_t *plinux_dlopen(const char *lib);
