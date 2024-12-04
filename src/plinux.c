@@ -123,7 +123,7 @@ LibraryNode *parse_libraries_from_maps(pid_t pid)
  */
 void *search_symbol_in_library(const char *library, const char *symbol_name)
 {
-    void *handle = dlopen(library, RTLD_LAZY);
+    void *handle = dlopen(library, RTLD_NOLOAD | RTLD_GLOBAL);
     if (!handle)
     {
         return NULL;
