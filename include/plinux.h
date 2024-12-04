@@ -17,16 +17,17 @@ along with this program; see the file COPYING. If not, see
 
 #pragma once
 
+#include <plthook.h>
 #include <sys/types.h>
-#include <stdint.h>
 
-long int pt_attach(pid_t pid);
-
-long int
-pt_detach(pid_t pid);
+long int plinux_attach(pid_t pid);
 
 long int
-pt_continue(pid_t pid, int sig);
+plinux_detach(pid_t pid);
 
-intptr_t
-pt_resolve(pid_t pid, const char *nid);
+long int
+plinux_continue(pid_t pid, int sig);
+
+plthook_t *plinux_dlopen_self();
+void *plinux_resolve(plthook_t *plthook, const char *nid);
+plthook_t *plinux_dlopen(const char *lib);

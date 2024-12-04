@@ -4,18 +4,30 @@
 
 int main(int argc, char *argv[])
 {
-    if (argc >= 2)
+    if (argc < 3)
     {
-        if (pt_attach(atoi(argv[1])) != -1)
+        fprintf(stderr, "Usage: %s <symbol_name>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    if (plinux_attach(atoi(argv[1])) != -1)
+    {
+        const char *nid = argv[2];
+        plthook_t *plthook = plinux_dlopen_self();
+        if (!plthook)
         {
-            puts("[+] pt_attach pid succesful");
+            return EXIT_FAILURE;
         }
 
-        if (pt_detach(atoi(argv[1])) != -1)
+        void *addr = plinux_resolve(plthook, nid);
+        if (addr)
         {
-            puts("[+] pt_detach pid succesful");
+            printf("Resolved address: %p\n", addr);
         }
+
+        plthook_close(plthook);
+        return addr ? EXIT_SUCCESS : EXIT_FAILURE;
     }
-    
+
     return 0;
 }
