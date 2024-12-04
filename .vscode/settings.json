@@ -1,5 +1,7 @@
 {
     "files.associations": {
-        "types.h": "c"
+        "types.h": "c",
+        "ptrace.h": "c",
+        "compare": "c"
     }
 }

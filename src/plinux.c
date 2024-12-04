@@ -23,55 +23,9 @@
 #include <sys/ptrace.h>
 #include <dlfcn.h>
 #include <unistd.h>
-
-/**
- * Attach to a process.
- *
- * @param pid Process ID to attach to.
- * @return 0 on success, -1 on failure.
- */
-long int plinux_attach(pid_t pid)
-{
-    if (ptrace(PT_ATTACH, pid, NULL, NULL) == -1)
-    {
-        perror("ptrace(plinux_ATTACH) failed");
-        return -1;
-    }
-    return 0;
-}
-
-/**
- * Detach from a process.
- *
- * @param pid Process ID to detach from.
- * @return 0 on success, -1 on failure.
- */
-long int plinux_detach(pid_t pid)
-{
-    if (ptrace(PT_DETACH, pid, NULL, NULL) == -1)
-    {
-        perror("ptrace(plinux_DETACH) failed");
-        return -1;
-    }
-    return 0;
-}
-
-/**
- * Continue a process after attaching.
- *
- * @param pid Process ID to continue.
- * @param sig Signal to deliver (0 for no signal).
- * @return 0 on success, -1 on failure.
- */
-long int plinux_continue(pid_t pid, int sig)
-{
-    if (ptrace(PT_CONTINUE, pid, (caddr_t)1, sig) == -1)
-    {
-        perror("ptrace(plinux_CONTINUE) failed");
-        return -1;
-    }
-    return 0;
-}
+#include <sys/wait.h>
+#include <stdint.h>
+#include <stdarg.h>
 
 /**
  * Node structure for a dynamically growing list of libraries.
@@ -181,89 +135,194 @@ void *search_symbol_in_library(const char *library, const char *symbol_name)
 }
 
 /**
- * Resolve the address of a symbol in a process's loaded libraries.
- * 
- * @param pid Process ID to inspect.
- * @param symbol_name Symbol name to search for.
- * @return Address of the symbol, or NULL if not found.
+ * Attach to a process.
+ *
+ * @param pid Process ID to attach to.
+ * @return 0 on success, -1 on failure.
  */
-void* plinux_resolve(pid_t pid, const char* symbol_name) {
-    LibraryNode* libraries = parse_libraries_from_maps(pid);
-    if (!libraries) {
+long int plinux_attach(pid_t pid)
+{
+    if (ptrace(PT_ATTACH, pid, NULL, NULL) == -1)
+    {
+        perror("ptrace(plinux_ATTACH) failed");
+        return -1;
+    }
+    if (waitpid(pid, 0, 0) < 0)
+    {
+        perror("waitpid failed");
+        return -1;
+    }
+
+    return 0;
+}
+
+/**
+ * Detach from a process.
+ *
+ * @param pid Process ID to detach from.
+ * @return 0 on success, -1 on failure.
+ */
+long int plinux_detach(pid_t pid)
+{
+    if (ptrace(PT_DETACH, pid, NULL, NULL) == -1)
+    {
+        perror("ptrace(plinux_DETACH) failed");
+        return -1;
+    }
+    return 0;
+}
+
+long int plinux_step(pid_t pid)
+{
+    // Set the process to execute a single instruction
+    if (ptrace(PT_STEP, pid, (caddr_t)1, 0) == -1)
+    {
+        perror("ptrace(plinux_STEP) failed");
+        return -1;
+    }
+
+    // Wait for the process to stop after stepping
+    if (waitpid(pid, NULL, 0) < 0)
+    {
+        perror("waitpid after ptrace_step failed");
+        return -1;
+    }
+
+    return 0;
+}
+
+long int plinux_getregs(pid_t pid, struct user_regs_struct *r)
+{
+    if (!r)
+    {
+        fprintf(stderr, "plinux_getregs: Invalid pointer to user_regs_struct\n");
+        return -1;
+    }
+
+    long int result = ptrace(PTRACE_GETREGS, pid, NULL, r);
+    if (result == -1)
+    {
+        perror("plinux_getregs: ptrace PTRACE_GETREGS failed");
+    }
+    return result;
+}
+
+long int plinux_setregs(pid_t pid, const struct user_regs_struct *r)
+{
+    if (!r)
+    {
+        fprintf(stderr, "plinux_setregs: Invalid pointer to user_regs_struct\n");
+        return -1;
+    }
+
+    long int result = ptrace(PTRACE_SETREGS, pid, NULL, r);
+    if (result == -1)
+    {
+        perror("plinux_setregs: ptrace PTRACE_SETREGS failed");
+    }
+    return result;
+}
+
+long int plinux_continue(pid_t pid, int sig)
+{
+    if (ptrace(PT_CONTINUE, pid, (caddr_t)1, sig) == -1)
+    {
+        perror("ptrace(plinux_CONTINUE) failed");
+        return -1;
+    }
+    return 0;
+}
+
+long plinux_call(pid_t pid, void* addr, ...)
+{
+    struct user_regs_struct jmp_reg;
+    struct user_regs_struct bak_reg;
+    va_list ap;
+
+    // Get current register values to restore later
+    if (plinux_getregs(pid, &bak_reg) == -1)
+    {
+        perror("plinux_getregs failed");
+        return -1;
+    }
+
+    // Prepare the registers to jump to the address
+    memcpy(&jmp_reg, &bak_reg, sizeof(jmp_reg));
+    jmp_reg.rip = (unsigned long long)addr;
+
+    va_start(ap, addr);
+    jmp_reg.rdi = va_arg(ap, uint64_t);
+    jmp_reg.rsi = va_arg(ap, uint64_t);
+    jmp_reg.rdx = va_arg(ap, uint64_t);
+    jmp_reg.rcx = va_arg(ap, uint64_t);
+    jmp_reg.r8 = va_arg(ap, uint64_t);
+    jmp_reg.r9 = va_arg(ap, uint64_t);
+    va_end(ap);
+
+    // Set the registers for the function call
+    if (plinux_setregs(pid, &jmp_reg) == -1)
+    {
+        perror("plinux_setregs failed");
+        return -1;
+    }
+
+    // Execute the function (single step)
+    if (plinux_step(pid) == -1)
+    {
+        perror("plinux_step failed");
+        return -1;
+    }
+
+    // Get the registers after execution to retrieve return value
+    if (plinux_getregs(pid, &jmp_reg) == -1)
+    {
+        perror("plinux_getregs failed after step");
+        return -1;
+    }
+
+    // Restore the original registers
+    if (plinux_setregs(pid, &bak_reg) == -1)
+    {
+        perror("plinux_setregs failed during restore");
+        return -1;
+    }
+
+    return jmp_reg.rax; // Return the result (in RAX register)
+}
+
+/**
+ * Example function to resolve symbols from a library within the process.
+ */
+void *plinux_resolve(pid_t pid, const char *symbol_name)
+{
+    // Assuming we already have the library list
+    LibraryNode *libraries = parse_libraries_from_maps(pid);
+    if (!libraries)
+    {
         return NULL;
     }
 
-    void* symbol_address = NULL;
-    LibraryNode* current = libraries;
+    void *symbol_address = NULL;
+    LibraryNode *current = libraries;
 
-    while (current) {
+    while (current)
+    {
         symbol_address = search_symbol_in_library(current->path, symbol_name);
-
-        if (symbol_address) {
-            // Stop searching if the symbol is found
-            break;
+        if (symbol_address)
+        {
+            break; // Symbol found, break out of the loop
         }
-
         current = current->next;
     }
 
-    // Free the library list
-    while (libraries) {
-        LibraryNode* temp = libraries;
+    // Free the list of libraries
+    while (libraries)
+    {
+        LibraryNode *temp = libraries;
         libraries = libraries->next;
         free(temp->path);
         free(temp);
     }
 
     return symbol_address;
-}
-
-
-/**
- * Open the PLT of the current process.
- *
- * @return plthook_t* Pointer to the PLT hook instance, or NULL on failure.
- */
-plthook_t *plinux_dlopen_self()
-{
-    plthook_t *plthook = NULL;
-
-    if (plthook_open(&plthook, NULL) != 0)
-    {
-        fprintf(stderr, "plthook_open_by_handle failed: %s\n", plthook_error());
-        return NULL;
-    }
-
-    return plthook;
-}
-
-/**
- * Open the PLT of the current process.
- *
- * @return plthook_t* Pointer to the PLT hook instance, or NULL on failure.
- */
-plthook_t *plinux_dlopen(const char *lib)
-{
-    plthook_t *plthook = NULL;
-
-    // Open a handle to the current process using dlopen with NULL
-    void *handle = dlopen(lib, RTLD_LAZY);
-    if (!handle)
-    {
-        fprintf(stderr, "dlopen failed: %s\n", dlerror());
-        return NULL;
-    }
-
-    // Open the PLT using the handle
-    if (plthook_open_by_handle(&plthook, handle) != 0)
-    {
-        fprintf(stderr, "plthook_open_by_handle failed: %s\n", plthook_error());
-        dlclose(handle);
-        return NULL;
-    }
-
-    // dlclose is safe to call here because plthook retains the handle
-    dlclose(handle);
-
-    return plthook;
 }

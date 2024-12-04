@@ -19,14 +19,16 @@ along with this program; see the file COPYING. If not, see
 
 #include <plthook.h>
 #include <sys/types.h>
+#include <sys/user.h>
+#include <stdint.h>
 
 long int plinux_attach(pid_t pid);
-
-long int
-plinux_detach(pid_t pid);
-
-long int
-plinux_continue(pid_t pid, int sig);
+long int plinux_detach(pid_t pid);
+long int plinux_continue(pid_t pid, int sig);
+long int plinux_step(pid_t pid);
+long int plinux_getregs(pid_t pid, struct user_regs_struct *r);
+long int plinux_setregs(pid_t pid, const struct user_regs_struct *r);
+long plinux_call(pid_t pid, void* addr, ...);
 
 plthook_t *plinux_dlopen_self();
 void *plinux_resolve(pid_t pid, const char *symbol_name);
