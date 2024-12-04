@@ -147,6 +147,7 @@ long int plinux_attach(pid_t pid)
         perror("ptrace(plinux_ATTACH) failed");
         return -1;
     }
+
     if (waitpid(pid, 0, 0) < 0)
     {
         perror("waitpid failed");
@@ -166,7 +167,7 @@ long int plinux_detach(pid_t pid)
 {
     if (ptrace(PT_DETACH, pid, NULL, NULL) == -1)
     {
-        perror("ptrace(plinux_DETACH) failed");
+        perror("ptrace(PT_DETACH) failed");
         return -1;
     }
     return 0;
@@ -174,17 +175,14 @@ long int plinux_detach(pid_t pid)
 
 long int plinux_step(pid_t pid)
 {
-    // Set the process to execute a single instruction
-    if (ptrace(PT_STEP, pid, (caddr_t)1, 0) == -1)
+    if (ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL) == -1)
     {
-        perror("ptrace(plinux_STEP) failed");
+        perror("ptrace(PTRACE_SINGLESTEP) failed");
         return -1;
     }
 
-    // Wait for the process to stop after stepping
-    if (waitpid(pid, NULL, 0) < 0)
+    if (waitpid(pid, 0, 0) < 0)
     {
-        perror("waitpid after ptrace_step failed");
         return -1;
     }
 
@@ -193,58 +191,38 @@ long int plinux_step(pid_t pid)
 
 long int plinux_getregs(pid_t pid, struct user_regs_struct *r)
 {
-    if (!r)
-    {
-        fprintf(stderr, "plinux_getregs: Invalid pointer to user_regs_struct\n");
-        return -1;
-    }
-
-    long int result = ptrace(PTRACE_GETREGS, pid, NULL, r);
-    if (result == -1)
-    {
-        perror("plinux_getregs: ptrace PTRACE_GETREGS failed");
-    }
-    return result;
+    return ptrace(PT_GETREGS, pid, 0, r);
 }
 
 long int plinux_setregs(pid_t pid, const struct user_regs_struct *r)
 {
-    if (!r)
-    {
-        fprintf(stderr, "plinux_setregs: Invalid pointer to user_regs_struct\n");
-        return -1;
-    }
-
-    long int result = ptrace(PTRACE_SETREGS, pid, NULL, r);
-    if (result == -1)
-    {
-        perror("plinux_setregs: ptrace PTRACE_SETREGS failed");
-    }
-    return result;
+    return ptrace(PT_SETREGS, pid, NULL, r);
 }
 
 long int plinux_continue(pid_t pid, int sig)
 {
     if (ptrace(PT_CONTINUE, pid, (caddr_t)1, sig) == -1)
     {
-        perror("ptrace(plinux_CONTINUE) failed");
+        perror("ptrace(PT_CONTINUE) failed");
         return -1;
     }
     return 0;
 }
 
-long plinux_call(pid_t pid, void* addr, ...)
+long plinux_call(pid_t pid, void *addr, ...)
 {
     struct user_regs_struct jmp_reg;
     struct user_regs_struct bak_reg;
     va_list ap;
 
     // Get current register values to restore later
-    if (plinux_getregs(pid, &bak_reg) == -1)
+    if (plinux_getregs(pid, &bak_reg))
     {
         perror("plinux_getregs failed");
         return -1;
     }
+
+    printf("RIP = %p\n", bak_reg.rip);
 
     // Prepare the registers to jump to the address
     memcpy(&jmp_reg, &bak_reg, sizeof(jmp_reg));
@@ -259,31 +237,39 @@ long plinux_call(pid_t pid, void* addr, ...)
     jmp_reg.r9 = va_arg(ap, uint64_t);
     va_end(ap);
 
-    // Set the registers for the function call
-    if (plinux_setregs(pid, &jmp_reg) == -1)
+    if (plinux_setregs(pid, &jmp_reg))
     {
         perror("plinux_setregs failed");
         return -1;
     }
 
-    // Execute the function (single step)
-    if (plinux_step(pid) == -1)
+    if (plinux_getregs(pid, &jmp_reg))
     {
-        perror("plinux_step failed");
+        perror("plinux_getregs failed");
         return -1;
     }
 
-    // Get the registers after execution to retrieve return value
-    if (plinux_getregs(pid, &jmp_reg) == -1)
+    printf("RIP = %p\n", jmp_reg.rip);
+
+    // single step until the function returns
+    while (jmp_reg.rsp <= bak_reg.rsp)
     {
-        perror("plinux_getregs failed after step");
-        return -1;
+        //if (plinux_step(pid))
+        //{
+        //     return -1;
+        //}
+        sleep(1);
+        if (plinux_getregs(pid, &jmp_reg) == -1)
+        {
+            return -1;
+        }
+        printf("%llx\n", jmp_reg.rip);
     }
 
-    // Restore the original registers
-    if (plinux_setregs(pid, &bak_reg) == -1)
+    // restore registers
+    if (plinux_setregs(pid, &bak_reg))
     {
-        perror("plinux_setregs failed during restore");
+        perror("plinux_setregs failed");
         return -1;
     }
 
