@@ -40,15 +40,25 @@ int main(int argc, char *argv[])
 
     printf("[*] Resolved address for '%s': %p\n", malloc_symbol, malloc_addr);
 
-    uint64_t alloc = plinux_call(pid, malloc_addr, 10);
-    if (alloc == (uint64_t)-1)
+    char *alloc = (char *)plinux_call(pid, malloc_addr, 1000); // call malloc
+    printf("[*] Memory malloc allocated in '%lx'\n", alloc);
+
+    const char *hello = "Hello World";
+    plinux_write_memory(pid, alloc, hello, strlen(hello));
+
+    const char *puts_symbol = "puts";
+    void *puts_addr = plinux_resolve(pid, puts_symbol);
+
+    if (!puts_addr)
     {
-        fprintf(stderr, "Failed to call function at %p\n", malloc_symbol);
+        fprintf(stderr, "[*] Failed to resolve symbol: %s\n", puts_symbol);
         plinux_detach(pid);
         return EXIT_FAILURE;
     }
 
-    printf("[*] Memory malloc allocated in '%lx'\n", alloc);
+    printf("[*] Resolved address for '%s': %p\n", puts_symbol, puts_addr);
+
+    plinux_call(pid, puts, alloc, RTLD_NOW | RTLD_LAZY); // call puts
 
     if (plinux_detach(pid) == -1)
     {

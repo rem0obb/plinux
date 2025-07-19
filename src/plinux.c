@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <sys/user.h>
+#include <signal.h>
 
 /**
  * Node structure for a dynamically growing list of libraries.
@@ -134,9 +135,20 @@ long int plinux_setregs(pid_t pid, const struct user_regs_struct *r)
     return ptrace(PTRACE_SETREGS, pid, NULL, r);
 }
 
+long int plinux_continue(pid_t pid, int sig)
+{
+    if (ptrace(PT_CONTINUE, pid, (off_t)1, sig) == -1)
+    {
+        perror("[*] ptrace(PT_CONTINUE) failed");
+        return -1;
+    }
+
+    return 0;
+}
+
 long int plinux_step(pid_t pid)
 {
-    if (ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL) == -1)
+    if (ptrace(PTRACE_SINGLESTEP, pid, (off_t)1, 0) == -1)
     {
         perror("[*] ptrace(PTRACE_SINGLESTEP) failed");
         return -1;
@@ -165,9 +177,12 @@ long plinux_call(pid_t pid, void *addr, ...)
 
     memcpy(&jmp_reg, &bak_reg, sizeof(jmp_reg));
     jmp_reg.rip = (uint64_t)addr;
+    jmp_reg.rax = 0; /* I need to reset rax*/
 
-    jmp_reg.rax = 0; /* I need to reset rax
-                      */
+    /*System V AMD64 ABI
+    The first six integer or pointer arguments are passed in registers
+    RDI, RSI, RDX, RCX, R8, R9 (R10 is used as a static chain pointer in case of nested functions[28]: 21 )
+    */
     va_start(ap, addr);
     jmp_reg.rdi = va_arg(ap, uint64_t);
     jmp_reg.rsi = va_arg(ap, uint64_t);
@@ -182,26 +197,18 @@ long plinux_call(pid_t pid, void *addr, ...)
 
     if (plinux_getregs(pid, &jmp_reg) == -1)
     {
-        printf("ERROR plinux_getregs\n");
+        perror("[*] plinux_getregs failed");
         return -1;
     }
-
-    printf("rax=%p\n", jmp_reg.rax);
 
     // Continue until return (rsp grows back)
     while (jmp_reg.rsp <= bak_reg.rsp)
     {
         // printf("[*] RSP = %p RIP = %p\n", jmp_reg.rsp, jmp_reg.rip);
         if (plinux_step(pid) == -1)
-        {
-            printf("ERROR plinux_step\n");
             return -1;
-        }
         if (plinux_getregs(pid, &jmp_reg) == -1)
-        {
-            printf("ERROR plinux_getregs\n");
             return -1;
-        }
     }
 
     // Restore original registers
@@ -209,6 +216,31 @@ long plinux_call(pid_t pid, void *addr, ...)
         return -1;
 
     return jmp_reg.rax;
+}
+
+long int plinux_write_memory(pid_t pid, void *remote_addr, const void *data, size_t size)
+{
+    size_t i;
+    union u
+    {
+        long val;
+        char chars[sizeof(long)];
+    } d;
+
+    for (i = 0; i < size; i += sizeof(long))
+    {
+        memset(d.chars, 0, sizeof(long));
+        size_t copy_size = (size - i >= sizeof(long)) ? sizeof(long) : (size - i);
+        memcpy(d.chars, data + i, copy_size);
+
+        if (ptrace(PTRACE_POKETEXT, pid, (uint8_t *)remote_addr + i, d.val) == -1)
+        {
+            perror("[*] ptrace(PTRACE_POKETEXT) failed");
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 void *plinux_resolve(pid_t pid, const char *symbol_name)

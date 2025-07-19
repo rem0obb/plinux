@@ -17,7 +17,6 @@ along with this program; see the file COPYING. If not, see
 
 #pragma once
 
-#include <plthook.h>
 #include <sys/types.h>
 #include <sys/user.h>
 #include <stdint.h>
@@ -25,11 +24,9 @@ along with this program; see the file COPYING. If not, see
 long int plinux_attach(pid_t pid);
 long int plinux_detach(pid_t pid);
 long int plinux_continue(pid_t pid, int sig);
+long int plinux_write_memory(pid_t pid, void *remote_addr, const void *data, size_t size);
 long int plinux_step(pid_t pid);
 long int plinux_getregs(pid_t pid, struct user_regs_struct *r);
 long int plinux_setregs(pid_t pid, const struct user_regs_struct *r);
-long plinux_call(pid_t pid, void* addr, ...);
-
-plthook_t *plinux_dlopen_self();
+long plinux_call(pid_t pid, void *addr, ...);
 void *plinux_resolve(pid_t pid, const char *symbol_name);
-plthook_t *plinux_dlopen(const char *lib);
