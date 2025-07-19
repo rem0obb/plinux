@@ -212,12 +212,6 @@ long plinux_call(pid_t pid, void *addr, ...)
     if (plinux_setregs(pid, &jmp_reg))
         return -1;
 
-    if (plinux_getregs(pid, &jmp_reg) == -1)
-    {
-        perror("[*] plinux_getregs failed");
-        return -1;
-    }
-
     // Continue until return (rsp grows back)
     while (jmp_reg.rsp <= bak_reg.rsp)
     {

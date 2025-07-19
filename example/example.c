@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 
     printf("[*] Resolved address for '%s': %p\n", puts_symbol, puts_addr);
 
-    plinux_call(pid, puts, alloc, RTLD_NOW | RTLD_LAZY); // call puts
+    plinux_call(pid, puts, alloc); // call puts
 
     if (plinux_detach(pid) == -1)
     {
