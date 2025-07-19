@@ -40,8 +40,8 @@ int main(int argc, char *argv[])
 
     printf("[*] Resolved address for '%s': %p\n", malloc_symbol, malloc_addr);
 
-    char *alloc = (char *)plinux_call(pid, malloc_addr, 1000); // call malloc
-    printf("[*] Memory malloc allocated in '%lx'\n", alloc);
+    void *alloc = (void*)plinux_call(pid, malloc_addr, 1000); // call malloc
+    printf("[*] Memory malloc allocated in '%p'\n", alloc);
 
     const char *hello = "Hello World";
     plinux_write_memory(pid, alloc, hello, strlen(hello));

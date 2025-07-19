@@ -8,13 +8,7 @@ PLINUX is a C library for remote process manipulation on Linux using `ptrace`. I
 
 ## Example Usage
 
-$ sudo ./example 1234  
-[*] Successfully attached to process 1234  
-[*] Resolved address for 'malloc': 0x7f...  
-[*] Memory malloc allocated in '7f...'  
-[*] Resolved address for 'puts': 0x7f...  
-[*] Successfully detached from process 1234
-
+![](assets/example.png)
 [example here](/example/)
 
 ## Features
