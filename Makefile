@@ -32,5 +32,6 @@ $(EXAMPLE_DIR)/%: $(EXAMPLE_DIR)/%.c $(BUILD_DIR)/$(LIB_NAME)
 
 clean:
 	rm -rf $(BUILD_DIR)
+	rm example/example example/process
 
 .PHONY: all clean
